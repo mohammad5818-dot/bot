@@ -10,8 +10,8 @@ import re
 # تنظیمات و ثابت‌ها
 # =========================================================
 # ⭐ هاردکد توکن تلگرام و API هوش مصنوعی
-TOKEN = "1234567890" 
-AI_API_KEY = "123456" 
+TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4" 
+AI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" 
 TARGET_CHANNEL_USERNAME = "@hodhod500_ax" 
 
 PORT = int(os.environ.get("PORT", 8443)) 
@@ -364,3 +364,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
