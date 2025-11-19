@@ -55,5 +55,6 @@ def main():
     print(f"ربات با وب‌هوک روی URL زیر اجرا شد: {full_url}")
     updater.idle() 
 
-if name == "__main__":
+if __name__ == "__main__":
     main()
+
