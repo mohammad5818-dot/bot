@@ -1,3 +1,4 @@
+موسوی, [20/11/25 01:19 ق.ظ]
 from telegram.ext import Application, CommandHandler, MessageHandler
 from telegram.ext import filters 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup # ۱. اضافه شدن Update
@@ -102,5 +103,39 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if user_states.get(user_id, {'state': 0})['state'] == 1:
         return 
-
+        
     await update.message.reply_text("لطفا عکس خود را بفرستید یا از دستور /start استفاده کنید.")
+
+موسوی, [20/11/25 01:19 ق.ظ]
+# =========================================================
+# تابع اصلی و اجرای وب‌هوک
+# =========================================================
+def main():
+    if not TOKEN or not WEBHOOK_URL:
+        print("خطا: متغیرهای محیطی TOKEN یا WEBHOOK_URL در Render تنظیم نشده‌اند.")
+        return
+
+    application = (
+        Application.builder()
+        .token(TOKEN)
+        .build()
+    )
+    
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_prompt)) 
+    application.add_handler(CommandHandler("start", start))
+    
+    # --- تنظیمات وب‌هوک ---
+    full_url = WEBHOOK_URL + WEBHOOK_PATH
+    
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path=WEBHOOK_PATH,
+        webhook_url=full_url
+    )
+
+    print(f"ربات با وب‌هوک روی URL زیر اجرا شد: {full_url}")
+
+if __name__ == "__main__":
+    main()
