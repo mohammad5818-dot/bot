@@ -2,16 +2,19 @@ from telegram.ext import Application, CommandHandler, MessageHandler
 from telegram.ext import filters, CallbackQueryHandler 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup 
 from telegram.ext import ContextTypes 
+from telegram import InputFile # برای ارسال فایل از بایت‌ها
 import os 
-import json 
-import re 
+import io # برای مدیریت داده‌های باینری عکس
+from google import genai # ⭐ افزودن کتابخانه Google GenAI
+from google.genai.errors import APIError # برای هندل کردن خطاهای API
 
 # =========================================================
 # تنظیمات و ثابت‌ها
 # =========================================================
-# ⭐ هاردکد توکن تلگرام و API هوش مصنوعی
+# ⭐ هاردکد توکن تلگرام و کلید API Gemini
 TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4" 
-AI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" 
+# ⭐ کلید Gemini API باید در اینجا یا از طریق متغیر محیطی تنظیم شود.
+GEMINI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" 
 TARGET_CHANNEL_USERNAME = "@hodhod500_ax" 
 
 PORT = int(os.environ.get("PORT", 8443)) 
@@ -24,6 +27,17 @@ user_credits = {}
 # =========================================================
 # توابع مدیریتی و کمکی
 # =========================================================
+
+# اتصال به Gemini
+try:
+    if GEMINI_API_KEY and GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE":
+        client = genai.Client(api_key=GEMINI_API_KEY)
+    else:
+        print("هشدار: GEMINI_API_KEY تنظیم نشده است. فراخوانی‌های AI کار نخواهد کرد.")
+        client = None
+except Exception as e:
+    print(f"خطا در ایجاد کلاینت Gemini: {e}")
+    client = None
 
 def check_credit(user_id):
     """بررسی اعتبار کاربر"""
@@ -51,7 +65,6 @@ async def send_credit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================================================
 
 async def send_channel_check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ارسال پیام درخواست عضویت در کانال‌ها"""
     query = update.callback_query
     await query.answer() 
     user_id = query.from_user.id
@@ -74,7 +87,6 @@ async def send_channel_check_message(update: Update, context: ContextTypes.DEFAU
 
 
 async def check_membership_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندل کردن کلیک روی دکمه "عضو شدم و ادامه می‌دهم" و آغاز کار"""
     query = update.callback_query
     await query.answer("در حال بررسی... (فرض بر موفقیت است)")
     user_id = query.from_user.id
@@ -93,7 +105,6 @@ async def check_membership_callback(update: Update, context: ContextTypes.DEFAUL
 
 
 async def handle_invite_friends(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مدیریت دعوت دوستان"""
     query = update.callback_query
     await query.answer()
     
@@ -112,7 +123,6 @@ async def handle_invite_friends(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
 async def handle_purchase_plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش پلن‌های خرید اعتبار"""
     query = update.callback_query
     await query.answer()
 
@@ -129,7 +139,6 @@ async def handle_purchase_plans(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def handle_plan_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مدیریت کلیک روی پلن‌های خرید (ارسال لینک پرداخت فرضی)"""
     query = update.callback_query
     await query.answer()
     
@@ -177,7 +186,6 @@ async def share_to_channel_callback(update: Update, context: ContextTypes.DEFAUL
             caption=caption
         )
         
-        # به‌روزرسانی دکمه برای نشان دادن ارسال موفق
         await query.edit_message_reply_markup(
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("✅ به کانال نمونه‌ها ارسال شد", callback_data='dummy_sent')]
@@ -245,7 +253,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندل کردن متن پرامپت و پردازش AI (فقط برای عکس)"""
+    """هندل کردن متن پرامپت و پردازش AI (با Gemini Flash 2.5)"""
     user_id = update.message.from_user.id
     user_prompt = update.message.text
     
@@ -258,20 +266,73 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         media_type = 'photo'
         media_type_fa = "عکس"
         
-        
-        # ⭐ اصلاح شده: حذف آیدی فایل از پیام کاربر
+        # پیام شروع پردازش
         await update.message.reply_text(
             f"پرامپت شما: '{user_prompt}' دریافت شد.\n"
             f"{media_type_fa} شما در حال پردازش توسط هوش مصنوعی است. لطفا منتظر بمانید..."
         )
 
-        # 📌📌📌 محل استفاده از API Key هوش مصنوعی (AI) 📌📌📌
+        ai_output_media_id = None # برای نگهداری آیدی فایل تلگرام پس از آپلود مجدد
         
-        # --- فرض می‌کنیم که در اینجا پردازش AI انجام شده و نتیجه آماده ارسال است ---
-        # در اینجا باید منطق دانلود فایل تلگرام، ارسال به AI API با استفاده از AI_API_KEY و دریافت خروجی قرار گیرد.
-        ai_output_media_id = media_id # از مدیا آیدی اصلی برای شبیه‌سازی استفاده می‌شود
+        # 📌📌📌 اتصال واقعی به Gemini Flash 2.5 📌📌📌
         
-        # 📌📌📌 پایان محل استفاده از API Key هوش مصنوعی 📌📌📌
+        if client:
+            try:
+                # 1. دانلود عکس اصلی از تلگرام
+                file_object = await context.bot.get_file(media_id)
+                downloaded_file_bytes = await file_object.download_as_bytes()
+                
+                # 2. آماده‌سازی محتوا برای Gemini
+                image = client.files.upload(
+                    file=downloaded_file_bytes,
+                    mime_type='image/jpeg' # فرض می‌کنیم عکس JPEG است
+                )
+
+                # 3. فراخوانی مدل Gemini Flash 2.5
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=[
+                        image,
+                        f"این عکس را بر اساس دستور زیر ویرایش کن. فقط عکس ویرایش شده را خروجی بده. دستور: {user_prompt}"
+                    ]
+                )
+                
+                # 4. دریافت بایت‌های خروجی
+                # فرض می‌کنیم پاسخ یک عکس جدید را برمی‌گرداند (استفاده از response.candidates[0].content.parts[0].inline_data)
+                # در این پیاده‌سازی، ما فرض می‌کنیم مدل یک عکس درون خطی (inline) تولید می‌کند.
+                if response.candidates and response.candidates[0].content.parts[0].inline_data:
+                    # دریافت بایت‌های خروجی و تبدیل به InputFile
+                    output_data = response.candidates[0].content.parts[0].inline_data.data
+                    output_mime_type = response.candidates[0].content.parts[0].inline_data.mime_type
+                    
+                    # 5. ارسال خروجی به تلگرام و دریافت File ID جدید (برای ذخیره در user_data)
+                    # InputFile برای آپلود بایت‌ها به تلگرام استفاده می‌شود
+                    uploaded_message = await context.bot.send_photo(
+                        chat_id=update.effective_chat.id,
+                        photo=InputFile(io.BytesIO(output_data)), 
+                        caption="در حال نهایی‌سازی..." # یک کپشن موقت
+                    )
+                    ai_output_media_id = uploaded_message.photo[-1].file_id
+                    
+                else:
+                    await update.message.reply_text("❌ هوش مصنوعی نتوانست عکس جدیدی تولید کند. (خروجی بدون عکس بود.)")
+                    return # خروج بدون کسر اعتبار
+                
+                # حذف فایل موقت آپلود شده در Gemini
+                client.files.delete(name=image.name) 
+                
+            except APIError as e:
+                await update.message.reply_text(f"❌ خطای API هوش مصنوعی (Gemini): {e.message}")
+                return
+            except Exception as e:
+                await update.message.reply_text(f"❌ خطای نامشخص در پردازش تصویر: {e}")
+                return
+        
+        else:
+            await update.message.reply_text("❌ ربات به API هوش مصنوعی متصل نیست. لطفاً GEMINI_API_KEY را تنظیم کنید.")
+            return # خروج بدون کسر اعتبار
+            
+        # 📌📌📌 پایان اتصال واقعی به Gemini Flash 2.5 📌📌📌
         
         
         # کسر اعتبار
@@ -281,7 +342,7 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ذخیره اطلاعات برای اشتراک‌گذاری در کانال
         callback_key = f"share_{user_id}_{update.update_id}" 
         context.user_data[callback_key] = {
-            'media_id': ai_output_media_id, 
+            'media_id': ai_output_media_id, # آیدی عکس جدید تولید شده
             'prompt': user_prompt, 
             'media_type': media_type
         }
@@ -292,18 +353,19 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         share_markup = InlineKeyboardMarkup(share_keyboard)
         
-        # ارسال خروجی
+        # ارسال خروجی نهایی (به‌روزرسانی کپشن پیام موقتی که قبلا فرستاده شد)
         caption = (
             f"✅ پردازش موفقیت‌آمیز بود! (خروجی هوش مصنوعی)\n\n"
             f"اعتبار باقی‌مانده شما: {current_credit} عکس."
         )
         
-        try:
-            await update.message.reply_photo(photo=ai_output_media_id, caption=caption, reply_markup=share_markup)
-        except Exception:
-            await update.message.reply_text(caption, reply_markup=share_markup)
-
-
+        await context.bot.edit_message_caption(
+            chat_id=uploaded_message.chat.id,
+            message_id=uploaded_message.message_id,
+            caption=caption,
+            reply_markup=share_markup
+        )
+        
         # ریست وضعیت
         user_states[user_id] = {'state': 0}
         
@@ -337,13 +399,11 @@ def main():
     application.add_handler(CallbackQueryHandler(send_channel_check_message, pattern='^start_confirmation$'))
     application.add_handler(CallbackQueryHandler(check_membership_callback, pattern='^check_membership$'))
     
-    # ⭐ اصلاح شده با رشته خام r''
     application.add_handler(CallbackQueryHandler(share_to_channel_callback, pattern=r'^share_to_channel\|'))
 
     # هندلرهای مدیریت اعتبار
     application.add_handler(CallbackQueryHandler(handle_invite_friends, pattern='^credit_invite_friends$'))
     application.add_handler(CallbackQueryHandler(handle_purchase_plans, pattern='^credit_purchase_plans$'))
-    # ⭐ اصلاح شده با رشته خام r''
     application.add_handler(CallbackQueryHandler(handle_plan_selection, pattern=r'^buy_plan_(bronze|silver|gold)$'))
 
     # هندلرهای مدیا و متن
@@ -364,4 +424,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
