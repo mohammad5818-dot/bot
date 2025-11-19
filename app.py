@@ -1,4 +1,3 @@
-موسوی, [20/11/25 01:19 ق.ظ]
 from telegram.ext import Application, CommandHandler, MessageHandler
 from telegram.ext import filters 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup # ۱. اضافه شدن Update
@@ -139,3 +138,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
