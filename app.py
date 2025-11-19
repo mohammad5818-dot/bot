@@ -1,6 +1,6 @@
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler
 from telegram.ext import filters 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup # ایمپورت‌های جدید
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup 
 from telegram.ext import ContextTypes 
 import os 
 
@@ -16,6 +16,7 @@ TOKEN = os.environ.get("TOKEN")
 PORT = int(os.environ.get("PORT", 8443)) 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL") 
 WEBHOOK_PATH = "/" + TOKEN 
+
 
 # =========================================================
 # توابع هندلر (Handler Functions)
@@ -58,13 +59,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     
-    # حتماً باید این خط اجرا شود تا دایره‌ی چرخان از روی دکمه ناپدید شود
-    await query.answer() 
+    await query.answer() # دایره‌ی چرخان را حذف می‌کند
 
-    # اگر کاربر دکمه "بله" را زد:
     if query.data == 'start_yes':
         
-        # تعریف دکمه‌های کانال‌های اجباری
+        # تعریف دکمه‌های کانال‌های اجباری با لینک مستقیم
         channel_keyboard = [
             [
                 InlineKeyboardButton("کانال آموزش ربات هُدهُد", url="https://t.me/hodhod500_amoozesh"),
@@ -75,15 +74,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         channel_markup = InlineKeyboardMarkup(channel_keyboard)
 
-        # متن پیام
-        channel_message = (
-            "لطفاً برای شروع کار در دو کانال زیر عضو شوید:"
-        )
+        channel_message = ("لطفاً برای شروع کار در دو کانال زیر عضو شوید:")
 
-        # ارسال پیام جدید با دکمه‌های کانال
+        # ویرایش پیام قبلی با دکمه‌های کانال
         await query.edit_message_text(text=channel_message, reply_markup=channel_markup)
 
-    # اگر کاربر دکمه "خیر" را زد:
     elif query.data == 'start_no':
         await query.edit_message_text(text="بسیار خب! هر وقت آماده شدی، مجدداً دستور /start را ارسال کن.")
 
@@ -105,5 +100,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================================================
 def main():
     if not TOKEN or not WEBHOOK_URL:
+        # اگر متغیرها تنظیم نشده باشند، برنامه از اینجا خارج می‌شود.
         print("خطا: متغیرهای محیطی TOKEN یا WEBHOOK_URL در Render تنظیم نشده‌اند.")
         return
