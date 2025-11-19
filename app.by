@@ -1,0 +1,41 @@
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+import os # برای خواندن متغیرهای محیطی
+
+# اطلاعات مورد نیاز را از متغیرهای محیطی (Environment Variables) می‌خواند
+TOKEN = os.environ.get("TOKEN")
+# در محیط‌های ابری، Railway پورت را تنظیم می‌کند و ما آن را می‌خوانیم
+PORT = int(os.environ.get("PORT", 8443)) 
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL") 
+# یک متغیر URL_PATH برای امنیت بیشتر تعریف می‌کنیم
+WEBHOOK_PATH = "/" + TOKEN 
+
+
+# توابع ربات
+def start(update, context):
+    update.message.reply_text("سلام! ربات بر روی سرور ابری روشن است.")
+
+def echo(update, context):
+    text = update.message.text
+    update.message.reply_text(f"شما گفتید: {text}")
+
+def main():
+    updater = Updater(TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(MessageHandler(Filters.text, echo))
+
+    # --- تنظیمات وب‌هوک برای محیط ابری ---
+    
+    # 1. آدرس وب‌هوک را به تلگرام اطلاع می‌دهد
+    updater.bot.set_webhook(url=WEBHOOK_URL + WEBHOOK_PATH)
+    
+    # 2. ربات را به صورت سرور اجرا می‌کند
+    updater.start_webhook(listen="0.0.0.0",
+                          port=PORT,
+                          url_path=WEBHOOK_PATH) 
+
+    updater.idle()
+
+if __name__ == "__main__":
+    main()
