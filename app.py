@@ -1,6 +1,7 @@
 from telegram.ext import Updater, CommandHandler, MessageHandler
-from telegram.ext import filters # ۱. ایمپورت صحیح فیلترها
+from telegram.ext import filters 
 import os 
+from queue import Queue # ۱. ایمپورت کلاس Queue
 
 # =========================================================
 # بخش خواندن متغیرهای محیطی از Render
@@ -26,18 +27,18 @@ def echo(update, context):
 # =========================================================
 def main():
     if not TOKEN or not WEBHOOK_URL:
-        # این پیام فقط زمانی ظاهر می‌شود که متغیرها تنظیم نشده باشند
         print("خطا: متغیرهای محیطی TOKEN یا WEBHOOK_URL در Render تنظیم نشده‌اند.")
         return
 
-    # ۲. حذف use_context=True و update_queue (زیرا نسخه جدید را اجباری می‌کنیم)
-    updater = Updater(TOKEN) 
+    # ۲. اضافه کردن آرگومان update_queue=Queue() برای رفع خطای قدیمی
+    updater = Updater(TOKEN, update_queue=Queue()) 
+    
     dp = updater.dispatcher
 
     # ثبت دستور /start
     dp.add_handler(CommandHandler("start", start))
 
-    # ثبت هندلر پیام‌های متنی (استفاده از filters.TEXT)
+    # ثبت هندلر پیام‌های متنی
     dp.add_handler(MessageHandler(filters.TEXT, echo))
 
     # --- تنظیمات وب‌هوک ---
@@ -54,5 +55,5 @@ def main():
     print(f"ربات با وب‌هوک روی URL زیر اجرا شد: {full_url}")
     updater.idle() 
 
-if __name__ == "__main__":
+if name == "__main__":
     main()
