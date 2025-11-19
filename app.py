@@ -4,14 +4,14 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes 
 import os 
 import json 
-import re # اضافه شدن برای استفاده احتمالی در Regex
+import re 
 
 # =========================================================
 # تنظیمات و ثابت‌ها
 # =========================================================
-# ⭐ هاردکد توکن تلگرام و API هوش مصنوعی به درخواست شما
-TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4" 
-AI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" 
+# ⭐ هاردکد توکن تلگرام و API هوش مصنوعی
+TOKEN = "1234567890" 
+AI_API_KEY = "123456" 
 TARGET_CHANNEL_USERNAME = "@hodhod500_ax" 
 
 PORT = int(os.environ.get("PORT", 8443)) 
@@ -177,6 +177,7 @@ async def share_to_channel_callback(update: Update, context: ContextTypes.DEFAUL
             caption=caption
         )
         
+        # به‌روزرسانی دکمه برای نشان دادن ارسال موفق
         await query.edit_message_reply_markup(
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("✅ به کانال نمونه‌ها ارسال شد", callback_data='dummy_sent')]
@@ -258,14 +259,16 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         media_type_fa = "عکس"
         
         
+        # ⭐ اصلاح شده: حذف آیدی فایل از پیام کاربر
         await update.message.reply_text(
             f"پرامپت شما: '{user_prompt}' دریافت شد.\n"
-            f"{media_type_fa} شما (ID: {media_id}) در حال پردازش توسط هوش مصنوعی است. لطفا منتظر بمانید..."
+            f"{media_type_fa} شما در حال پردازش توسط هوش مصنوعی است. لطفا منتظر بمانید..."
         )
 
         # 📌📌📌 محل استفاده از API Key هوش مصنوعی (AI) 📌📌📌
         
         # --- فرض می‌کنیم که در اینجا پردازش AI انجام شده و نتیجه آماده ارسال است ---
+        # در اینجا باید منطق دانلود فایل تلگرام، ارسال به AI API با استفاده از AI_API_KEY و دریافت خروجی قرار گیرد.
         ai_output_media_id = media_id # از مدیا آیدی اصلی برای شبیه‌سازی استفاده می‌شود
         
         # 📌📌📌 پایان محل استفاده از API Key هوش مصنوعی 📌📌📌
