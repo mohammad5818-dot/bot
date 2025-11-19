@@ -6,22 +6,17 @@ import os
 # بخش خواندن متغیرهای محیطی از Render
 # =========================================================
 TOKEN = os.environ.get("TOKEN")
-# Render پورت را به عنوان یک متغیر محیطی تنظیم می‌کند.
 PORT = int(os.environ.get("PORT", 8443)) 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL") 
-# PATH امن برای وب‌هوک را از توکن می‌گیریم
 WEBHOOK_PATH = "/" + TOKEN 
 
 
 # =========================================================
 # توابع هندلر (Handler Functions)
 # =========================================================
-
-# دستور /start
 def start(update, context):
     update.message.reply_text("سلام! ربات بر روی سرور ابری روشن است و با وب‌هوک کار می‌کند. ✔️")
 
-# هندل پیام‌های معمولی
 def echo(update, context):
     text = update.message.text
     update.message.reply_text(f"شما گفتید: {text}")
@@ -35,8 +30,8 @@ def main():
         print("خطا: متغیرهای محیطی TOKEN یا WEBHOOK_URL در Render تنظیم نشده‌اند.")
         return
 
-    # ۲. حذف use_context=True
-    updater = Updater(TOKEN)
+    # ۲. حذف use_context=True و update_queue (زیرا نسخه جدید را اجباری می‌کنیم)
+    updater = Updater(TOKEN) 
     dp = updater.dispatcher
 
     # ثبت دستور /start
@@ -45,10 +40,10 @@ def main():
     # ثبت هندلر پیام‌های متنی (استفاده از filters.TEXT)
     dp.add_handler(MessageHandler(filters.TEXT, echo))
 
-    # --- تنظیمات وب‌هوک برای محیط ابری ---
-    
-    # 1. آدرس کامل وب‌هوک
+    # --- تنظیمات وب‌هوک ---
     full_url = WEBHOOK_URL + WEBHOOK_PATH
+    
+    # 1. آدرس کامل وب‌هوک را به تلگرام اطلاع می‌دهد
     updater.bot.set_webhook(url=full_url)
     
     # 2. اجرای وب‌هوک
