@@ -1,15 +1,32 @@
-from telegram.ext import Application, CommandHandler, MessageHandler
-from telegram.ext import filters, CallbackQueryHandler 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup 
-from telegram import InputFile 
-from telegram.ext import ContextTypes 
 import os 
 import io 
-from google import genai 
-from google.genai.errors import APIError 
 
 # =========================================================
-# تنظیمات و ثابت‌ها
+# بخش ۱: عیب‌یابی ایمپورت‌ها
+# اگر یکی از کتابخانه‌ها در requirements.txt نباشد، این بخش خطا می‌دهد
+# و Render را مطلع می‌کند.
+# =========================================================
+try:
+    from telegram.ext import Application, CommandHandler, MessageHandler
+    from telegram.ext import filters, CallbackQueryHandler 
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup 
+    from telegram import InputFile 
+    from telegram.ext import ContextTypes 
+    
+    from google import genai 
+    from google.genai.errors import APIError 
+    
+    print("✅ تمامی کتابخانه‌ها با موفقیت وارد شدند.")
+
+except ImportError as e:
+    # چاپ خطا به وضوح تا در لاگ‌های Render دیده شود
+    print(f"❌ خطای حیاتی ImportError: به نظر می‌رسد یکی از کتابخانه‌ها در requirements.txt نصب نشده است. جزئیات: {e}")
+    # خروج اجباری برنامه با کد خطا
+    exit(1)
+
+
+# =========================================================
+# بخش ۲: تنظیمات و ثابت‌ها
 # =========================================================
 # این مقادیر بهتر است از طریق متغیرهای محیطی Render تنظیم شوند.
 TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4"  
@@ -25,10 +42,10 @@ user_states = {}
 user_credits = {} 
 
 # =========================================================
-# توابع مدیریتی و کمکی
+# بخش ۳: توابع مدیریتی و اتصال به Gemini
 # =========================================================
 
-# اتصال به Gemini - مقداردهی اولیه فقط یک بار در این قسمت انجام می‌شود
+# اتصال به Gemini - مقداردهی اولیه فقط یک بار
 try:
     final_gemini_key = os.environ.get("GEMINI_API_KEY", GEMINI_API_KEY)
     
@@ -63,7 +80,7 @@ async def send_credit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =========================================================
-# توابع هندلر Callback Query (دکمه‌های شیشه‌ای)
+# بخش ۴: توابع هندلر Callback Query (دکمه‌های شیشه‌ای)
 # =========================================================
 
 async def send_channel_check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -204,7 +221,7 @@ async def share_to_channel_callback(update: Update, context: ContextTypes.DEFAUL
         await context.bot.send_message(query.from_user.id, error_message)
 
 # ---------------------------------------------------------
-## توابع هندلر پیام (دستورات و مدیا)
+## بخش ۵: توابع هندلر پیام (دستورات و مدیا)
 # ---------------------------------------------------------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -234,4 +251,75 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """هندل کردن عکس‌های دریافتی"""
-    user_id = update.message.from_user
+    user_id = update.message.from_user.id
+    
+    state = user_states.get(user_id, {'state': 0})
+    if state['state'] != 0:
+        await update.message.reply_text("لطفاً ابتدا مرحله عضویت در کانال را تکمیل کنید یا پرامپت خود را بفرستید.")
+        return
+
+    has_credit, current_credit = check_credit(user_id)
+    if not has_credit:
+        await send_credit_menu(update, context)
+        return
+
+    file_id = update.message.photo[-1].file_id 
+    
+    user_states[user_id] = {
+        'state': 1, 
+        'last_photo_id': file_id, 
+        'media_type': 'photo' 
+    }
+
+    await update.message.reply_text(
+        "عکس با موفقیت دریافت شد. حالا لطفاً تغییراتی که می‌خواهید روی این عکس اعمال شود (پرامپت) را در قالب یک پیام متنی برای من بنویسید."
+    )
+
+
+async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندل کردن متن پرامپت و پردازش AI (با Gemini Flash 2.5)"""
+    user_id = update.message.from_user.id
+    user_prompt_raw = update.message.text
+    
+    user_prompt = user_prompt_raw[:4000]
+    
+    state = user_states.get(user_id, {'state': 0})
+    current_state = state.get('state', 0)
+
+    if current_state == 1:
+        
+        media_id = state.get('last_photo_id')
+        media_type = 'photo'
+        media_type_fa = "عکس"
+        
+        await update.message.reply_text(
+            f"پرامپت شما: '{user_prompt[:50]}...' دریافت شد.\n"
+            f"{media_type_fa} شما در حال پردازش توسط هوش مصنوعی است. لطفا منتظر بمانید..."
+        )
+
+        ai_output_media_id = None 
+        uploaded_message = None 
+        image = None # برای مدیریت فایل Gemini
+        downloaded_file_bytes = None # برای ذخیره بایت‌ها
+
+        # 📌📌📌 اتصال واقعی به Gemini Flash 2.5 📌📌📌
+        
+        if client:
+            try:
+                # 1. دانلود عکس اصلی از تلگرام
+                telegram_file_object = await context.bot.get_file(media_id)
+                
+                if not hasattr(telegram_file_object, 'download_as_bytearray'):
+                    raise Exception(("کتابخانه python-telegram-bot قدیمی است. متد download_as_bytearray یافت نشد."))
+
+                downloaded_file_bytearray = await telegram_file_object.download_as_bytearray() 
+                downloaded_file_bytes = bytes(downloaded_file_bytearray)
+                
+                # 2. آماده‌سازی محتوا برای Gemini (با عیب‌یابی لایه‌ای)
+                try:
+                    # ⭐ بهینه‌سازی: اضافه کردن MIME Type برای رفع خطای آپلود بایت استرینگ
+                    image = client.files.upload(
+                        file=downloaded_file_bytes,
+                        mime_type='image/jpeg' 
+                    )
+                except Exception as upload_e:
