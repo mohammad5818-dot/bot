@@ -12,10 +12,11 @@ from google.genai.errors import APIError
 # تنظیمات و ثابت‌ها
 # =========================================================
 # این مقادیر بهتر است از طریق متغیرهای محیطی Render تنظیم شوند.
-TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4"  
+TOKEN = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY"  
 GEMINI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" 
 TARGET_CHANNEL_USERNAME = "@hodhod500_ax" 
 
+# متغیرهای محیطی حیاتی برای Render
 PORT = int(os.environ.get("PORT", 8443)) 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL") 
 WEBHOOK_PATH = "/" + os.environ.get("TOKEN", TOKEN) 
@@ -266,3 +267,30 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_prompt = user_prompt_raw[:4000]
     
     state = user_states.get(user_id, {'state': 0})
+    current_state = state.get('state', 0)
+
+    if current_state == 1:
+        
+        media_id = state.get('last_photo_id')
+        media_type = 'photo'
+        media_type_fa = "عکس"
+        
+        await update.message.reply_text(
+            f"پرامپت شما: '{user_prompt[:50]}...' دریافت شد.\n"
+            f"{media_type_fa} شما در حال پردازش توسط هوش مصنوعی است. لطفا منتظر بمانید..."
+        )
+
+        ai_output_media_id = None 
+        uploaded_message = None 
+        image = None # برای مدیریت فایل Gemini
+        downloaded_file_bytes = None # برای ذخیره بایت‌ها
+
+        # 📌📌📌 اتصال واقعی به Gemini Flash 2.5 📌📌📌
+        
+        if client:
+            try:
+                # 1. دانلود عکس اصلی از تلگرام
+                telegram_file_object = await context.bot.get_file(media_id)
+                
+                if not hasattr(telegram_file_object, 'download_as_bytearray'):
+                    raise Exception("کتابخانه python-telegram-bot قدیمی است
