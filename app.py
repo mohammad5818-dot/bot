@@ -12,8 +12,8 @@ from google.genai.errors import APIError
 # تنظیمات و ثابت‌ها
 # =========================================================
 # این مقادیر بهتر است از طریق متغیرهای محیطی Render تنظیم شوند.
-TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4"  # مقدار پیش‌فرض. حتماً در متغیر محیطی تنظیم شود.
-GEMINI_API_KEY = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4" # مقدار پیش‌فرض. حتماً در متغیر محیطی تنظیم شود.
+TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4"  
+GEMINI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" 
 TARGET_CHANNEL_USERNAME = "@hodhod500_ax" 
 
 PORT = int(os.environ.get("PORT", 8443)) 
@@ -110,7 +110,9 @@ async def handle_invite_friends(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     
     user_id = query.from_user.id
-    referral_link = f"https://t.me/{context.bot.username}?start=ref_{user_id}"
+    # برای نمایش نام کاربری ربات، به جای context.bot.username از نام کاربری ربات در اینجا استفاده کنید
+    bot_username = "YourBotUsername" # اگر نام کاربری ربات را می‌دانید، اینجا وارد کنید
+    referral_link = f"https://t.me/{context.bot.username if context.bot.username else bot_username}?start=ref_{user_id}"
     
     message = (
         "🔗 از طریق لینک زیر دوستانتان را به ربات دعوت کنید و بابت هر دعوت موفق، **۳ اعتبار رایگان** دریافت کنید:\n\n"
@@ -120,7 +122,8 @@ async def handle_invite_friends(update: Update, context: ContextTypes.DEFAULT_TY
     await query.edit_message_text(
         text=message,
         reply_markup=None,
-        parse_mode='Markdown'
+        # ⭐ اصلاحیه: حذف parse_mode برای جلوگیری از خطای parsing در لینک‌های خام
+        parse_mode='Markdown' 
     )
 
 async def handle_purchase_plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -191,7 +194,6 @@ async def share_to_channel_callback(update: Update, context: ContextTypes.DEFAUL
             caption=caption
         ) 
         
-        # ⭐ پرانتزها برای رفع SyntaxError بررسی و تأیید شدند
         await query.edit_message_reply_markup(
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("✅ به کانال نمونه‌ها ارسال شد", callback_data='dummy_sent')]
@@ -291,7 +293,6 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # 1. دانلود عکس اصلی از تلگرام
                 telegram_file_object = await context.bot.get_file(media_id)
                 
-                # بررسی متد دانلود صحیح
                 if not hasattr(telegram_file_object, 'download_as_bytearray'):
                     raise Exception("کتابخانه python-telegram-bot قدیمی است. متد download_as_bytearray یافت نشد.")
 
@@ -300,7 +301,6 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 downloaded_file_bytes = bytes(downloaded_file_bytearray)
                 
                 # 2. آماده‌سازی محتوا برای Gemini
-                # رفع خطای unexpected keyword argument
                 image = client.files.upload(
                     file=downloaded_file_bytes
                 )
@@ -335,7 +335,7 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"❌ خطای API هوش مصنوعی (Gemini): {e.message}")
                 return
             except Exception as e:
-                # ⭐ اصلاحیه عیب‌یابی: ارسال پیام خطا به ادمین (خودتان)
+                # ⭐ اصلاحیه: ارسال پیام خطا به ادمین (خودتان)
                 admin_id = update.effective_user.id 
                 
                 error_detail = str(e)
@@ -345,8 +345,9 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # ارسال جزئیات خطا به خود ادمین
                 await context.bot.send_message(
                     chat_id=admin_id,
-                    text=f"⚠️ **خطای عیب‌یابی (Admin Alert):**\n\n**جزئیات خطا:** {error_detail}",
-                    parse_mode='Markdown'
+                    text=f"⚠️ **خطای عیب‌یابی (Admin Alert):**\n\nجزئیات خطا: {error_detail}",
+                    # ⭐ اصلاحیه: حذف parse_mode برای جلوگیری از خطای parsing در متن خطای خام
+                    # parse_mode='Markdown' 
                 )
                 
                 # ارسال پیام کوتاه و دوستانه به کاربر نهایی
