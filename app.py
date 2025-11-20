@@ -298,7 +298,7 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 downloaded_file_bytes = bytes(downloaded_file_bytearray)
                 
                 # 2. آماده‌سازی محتوا برای Gemini
-                # ⭐ اصلاحیه: حذف 'mime_type' برای سازگاری با SDK جدید
+                # حذف 'mime_type' برای سازگاری با SDK جدید
                 image = client.files.upload(
                     file=downloaded_file_bytes
                 )
@@ -310,7 +310,7 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         image,
                         f"این عکس را بر اساس دستور زیر ویرایش کن. فقط عکس ویرایش شده را خروجی بده. دستور: {user_prompt}"
                     ]
-                ) # پرانتز بسته شد
+                ) 
                 
                 # 4. دریافت بایت‌های خروجی
                 if response.candidates and response.candidates[0].content.parts[0].inline_data:
@@ -400,4 +400,45 @@ def main():
     final_token = os.environ.get("TOKEN", TOKEN)
 
     if not WEBHOOK_URL:
-        print("خطا: متغیر محیطی WEBHOOK_URL در
+        # ⭐ اصلاح خطا: پرانتز و نقل قول رشته متنی بسته شد
+        print("خطا: متغیر محیطی WEBHOOK_URL در Render تنظیم نشده است.")
+        return
+
+    application = (
+        Application.builder()
+        .token(final_token) 
+        .build()
+    )
+    
+    # هندلرهای دستورات
+    application.add_handler(CommandHandler("start", start))
+    
+    # هندلرهای Callback Query (دکمه‌های شیشه‌ای)
+    application.add_handler(CallbackQueryHandler(send_channel_check_message, pattern='^start_confirmation$'))
+    application.add_handler(CallbackQueryHandler(check_membership_callback, pattern='^check_membership$'))
+    
+    application.add_handler(CallbackQueryHandler(share_to_channel_callback, pattern=r'^share_to_channel\|'))
+
+    # هندلرهای مدیریت اعتبار
+    application.add_handler(CallbackQueryHandler(handle_invite_friends, pattern='^credit_invite_friends$'))
+    application.add_handler(CallbackQueryHandler(handle_purchase_plans, pattern='^credit_purchase_plans$'))
+    application.add_handler(CallbackQueryHandler(handle_plan_selection, pattern=r'^buy_plan_(bronze|silver|gold)$'))
+
+    # هندلرهای مدیا و متن
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo)) 
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_prompt)) 
+    
+    # --- تنظیمات وب‌هوک ---
+    full_url = WEBHOOK_URL + WEBHOOK_PATH
+    
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path=WEBHOOK_PATH,
+        webhook_url=full_url
+    )
+
+    print(f"ربات با وب‌هوک روی URL زیر اجرا شد: {full_url}")
+
+if __name__ == "__main__":
+    main()
