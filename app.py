@@ -11,9 +11,9 @@ from google.genai.errors import APIError
 # =========================================================
 # تنظیمات و ثابت‌ها
 # =========================================================
-# این مقادیر بهتر است از طریق متغیرهای محیطی Render تنظیم شوند.
+# توصیه می‌شود این مقادیر از طریق متغیرهای محیطی Render تنظیم شوند.
 TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4" 
-GEMINI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" 
+GEMINI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" # ⭐ باید در متغیر محیطی Render تنظیم شود
 TARGET_CHANNEL_USERNAME = "@hodhod500_ax" 
 
 PORT = int(os.environ.get("PORT", 8443)) 
@@ -29,6 +29,7 @@ user_credits = {}
 
 # اتصال به Gemini
 try:
+    # ابتدا از متغیرهای محیطی می خواند، اگر نبود از هاردکد استفاده می کند
     final_gemini_key = os.environ.get("GEMINI_API_KEY", GEMINI_API_KEY)
     
     if final_gemini_key and final_gemini_key != "YOUR_GEMINI_API_KEY_HERE":
@@ -285,6 +286,7 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if client:
             try:
                 # 1. دانلود عکس اصلی از تلگرام
+                # ⭐ رفع قطعی خطای AttributeError با تغییر نام متغیر
                 telegram_file_object = await context.bot.get_file(media_id)
                 downloaded_file_bytes = await telegram_file_object.download_as_bytes() 
                 
@@ -327,6 +329,7 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"❌ خطای API هوش مصنوعی (Gemini): {e.message}")
                 return
             except Exception as e:
+                # خطای کلی را گزارش می کنیم
                 await update.message.reply_text(f"❌ خطای نامشخص در پردازش تصویر: {e}")
                 return
         
