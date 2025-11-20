@@ -13,7 +13,7 @@ from google.genai.errors import APIError
 # =========================================================
 # این مقادیر بهتر است از طریق متغیرهای محیطی Render تنظیم شوند.
 TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4"  # مقدار پیش‌فرض. حتماً در متغیر محیطی تنظیم شود.
-GEMINI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" # مقدار پیش‌فرض. حتماً در متغیر محیطی تنظیم شود.
+GEMINI_API_KEY = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4" # مقدار پیش‌فرض. حتماً در متغیر محیطی تنظیم شود.
 TARGET_CHANNEL_USERNAME = "@hodhod500_ax" 
 
 PORT = int(os.environ.get("PORT", 8443)) 
