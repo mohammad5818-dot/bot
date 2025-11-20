@@ -286,12 +286,11 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 # 1. دانلود عکس اصلی از تلگرام
                 
-                # ⭐ استفاده از متد download_as_bytearray به عنوان روش جایگزین
+                # استفاده از متد download_as_bytearray به عنوان روش جایگزین
                 telegram_file_object = await context.bot.get_file(media_id)
                 
                 # بررسی اطمینان از وجود متد
                 if not hasattr(telegram_file_object, 'download_as_bytearray'):
-                    # اگر این متد هم نباشد، نسخه کتابخانه بسیار قدیمی است
                     raise Exception("کتابخانه python-telegram-bot قدیمی است. متد download_as_bytearray یافت نشد.")
 
                 # دانلود فایل به صورت bytearray و تبدیل آن به bytes
@@ -306,3 +305,99 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 # 3. فراخوانی مدل Gemini Flash 2.5
                 response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=[
+                        image,
+                        f"این عکس را بر اساس دستور زیر ویرایش کن. فقط عکس ویرایش شده را خروجی بده. دستور: {user_prompt}"
+                    ]
+                ) # پرانتز بسته شد
+                
+                # 4. دریافت بایت‌های خروجی
+                if response.candidates and response.candidates[0].content.parts[0].inline_data:
+                    output_data = response.candidates[0].content.parts[0].inline_data.data
+                    
+                    # 5. ارسال خروجی به تلگرام و دریافت File ID جدید
+                    uploaded_message = await context.bot.send_photo(
+                        chat_id=update.effective_chat.id,
+                        photo=InputFile(io.BytesIO(output_data)), 
+                        caption="در حال نهایی‌سازی..." 
+                    )
+                    ai_output_media_id = uploaded_message.photo[-1].file_id
+                    
+                else:
+                    await update.message.reply_text("❌ هوش مصنوعی نتوانست عکس جدیدی تولید کند. (خروجی بدون عکس بود.)")
+                    client.files.delete(name=image.name) 
+                    return 
+                
+                # حذف فایل موقت آپلود شده در Gemini
+                client.files.delete(name=image.name) 
+                
+            except APIError as e:
+                await update.message.reply_text(f"❌ خطای API هوش مصنوعی (Gemini): {e.message}")
+                return
+            except Exception as e:
+                # خطای کلی را گزارش می کنیم
+                await update.message.reply_text(f"❌ خطای نامشخص در پردازش تصویر: {e}")
+                return
+        
+        else:
+            await update.message.reply_text("❌ ربات به API هوش مصنوعی متصل نیست. لطفاً GEMINI_API_KEY را تنظیم کنید.")
+            return
+            
+        # 📌📌📌 پایان اتصال واقعی به Gemini Flash 2.5 📌📌📌
+        
+        
+        # کسر اعتبار
+        user_credits[user_id] -= 1 
+        has_credit, current_credit = check_credit(user_id) 
+        
+        # ذخیره اطلاعات برای اشتراک‌گذاری در کانال
+        callback_key = f"share_{user_id}_{update.update_id}" 
+        context.user_data[callback_key] = {
+            'media_id': ai_output_media_id, 
+            'prompt': user_prompt, 
+            'media_type': media_type
+        }
+
+        # تعریف دکمه شیشه‌ای برای ارسال به کانال
+        share_keyboard = [
+            [InlineKeyboardButton("🖼 ارسال به کانال نمونه‌ها", callback_data=f'share_to_channel|{callback_key}')]
+        ]
+        share_markup = InlineKeyboardMarkup(share_keyboard)
+        
+        # ارسال خروجی نهایی (به‌روزرسانی کپشن پیام موقتی که قبلا فرستاده شد)
+        caption = (
+            f"✅ پردازش موفقیت‌آمیز بود! (خروجی هوش مصنوعی)\n\n"
+            f"اعتبار باقی‌مانده شما: {current_credit} عکس."
+        )
+        
+        if uploaded_message:
+            await context.bot.edit_message_caption(
+                chat_id=uploaded_message.chat.id,
+                message_id=uploaded_message.message_id,
+                caption=caption,
+                reply_markup=share_markup
+            )
+        
+        # ریست وضعیت
+        user_states[user_id] = {'state': 0}
+        
+        return
+
+    if current_state in ['waiting_for_start_confirm', 'waiting_for_channel_check']:
+        await update.message.reply_text("لطفا برای ادامه، روی دکمه‌های شیشه‌ای که زیر پیام‌های قبلی ارسال شد، کلیک کنید.")
+        return
+
+    await update.message.reply_text("لطفا عکس خود را بفرستید یا از دستور /start استفاده کنید.")
+
+
+# =========================================================
+# تابع اصلی و اجرای وب‌هوک
+# =========================================================
+def main():
+    
+    # برای محیط Render، ابتدا از متغیرهای محیطی می خوانیم.
+    final_token = os.environ.get("TOKEN", TOKEN)
+
+    if not WEBHOOK_URL:
+        print("خطا: متغیر محیطی WEBHOOK_URL در
