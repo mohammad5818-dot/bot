@@ -26,7 +26,7 @@ except ImportError as e:
 # بخش ۲: تنظیمات و ثابت‌ها
 # =========================================================
 # متغیرهای پیش‌فرض - مقادیر واقعی باید از Render خوانده شوند
-TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xpUuiGFuX8lXvzm4"  
+TOKEN = "8314422409:AAHVi3ecnPCXRdkj7JjRnxPDHeffOaPBt3A"  
 GEMINI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" 
 TARGET_CHANNEL_USERNAME = "@hodhod500_ax" 
 
@@ -388,3 +388,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
