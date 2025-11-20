@@ -11,7 +11,7 @@ from google.genai.errors import APIError
 # =========================================================
 # تنظیمات و ثابت‌ها
 # =========================================================
-# توصیه می‌شود این مقادیر از طریق متغیرهای محیطی Render تنظیم شوند.
+# این مقادیر بهتر است از طریق متغیرهای محیطی Render تنظیم شوند.
 TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4" 
 GEMINI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" # ⭐ باید در متغیر محیطی Render تنظیم شود
 TARGET_CHANNEL_USERNAME = "@hodhod500_ax" 
@@ -147,7 +147,6 @@ async def handle_plan_selection(update: Update, context: ContextTypes.DEFAULT_TY
     plan_key = query.data.split('_')[-1] 
     payment_link = "https://example.com/payment/" + plan_key 
     
-    # ⭐ رفع خطای SyntaxError با استفاده از f-string چندخطی استاندارد
     message = f"""
 ✅ پلن **{plan_key.upper()}** انتخاب شد.
 
@@ -286,9 +285,18 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if client:
             try:
                 # 1. دانلود عکس اصلی از تلگرام
-                # ⭐ رفع قطعی خطای AttributeError با تغییر نام متغیر
+                
+                # ⭐ استفاده از متد download_as_bytearray به عنوان روش جایگزین
                 telegram_file_object = await context.bot.get_file(media_id)
-                downloaded_file_bytes = await telegram_file_object.download_as_bytes() 
+                
+                # بررسی اطمینان از وجود متد
+                if not hasattr(telegram_file_object, 'download_as_bytearray'):
+                    # اگر این متد هم نباشد، نسخه کتابخانه بسیار قدیمی است
+                    raise Exception("کتابخانه python-telegram-bot قدیمی است. متد download_as_bytearray یافت نشد.")
+
+                # دانلود فایل به صورت bytearray و تبدیل آن به bytes
+                downloaded_file_bytearray = await telegram_file_object.download_as_bytearray() 
+                downloaded_file_bytes = bytes(downloaded_file_bytearray)
                 
                 # 2. آماده‌سازی محتوا برای Gemini
                 image = client.files.upload(
