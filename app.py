@@ -11,9 +11,9 @@ from google.genai.errors import APIError
 # =========================================================
 # تنظیمات و ثابت‌ها
 # =========================================================
-# این مقادیر بهتر است از متغیرهای محیطی Render خوانده شوند (با استفاده از os.environ.get)
+# توصیه می‌شود این مقادیر از طریق متغیرهای محیطی Render تنظیم شوند.
 TOKEN = "8314422409:AAF9hZ0uEe1gQH5Fx9xVpUuiGFuX8lXvzm4" 
-GEMINI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" # ⭐ باید در متغیر محیطی Render تنظیم شود
+GEMINI_API_KEY = "AIzaSyDtkVNu7esH4OfQWmK65leFtf4DU8eD1oY" 
 TARGET_CHANNEL_USERNAME = "@hodhod500_ax" 
 
 PORT = int(os.environ.get("PORT", 8443)) 
@@ -29,8 +29,11 @@ user_credits = {}
 
 # اتصال به Gemini
 try:
-    if GEMINI_API_KEY and GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE":
-        client = genai.Client(api_key=GEMINI_API_KEY)
+    # ابتدا از متغیرهای محیطی می خواند، اگر نبود از هاردکد استفاده می کند
+    final_gemini_key = os.environ.get("GEMINI_API_KEY", GEMINI_API_KEY)
+    
+    if final_gemini_key and final_gemini_key != "YOUR_GEMINI_API_KEY_HERE":
+        client = genai.Client(api_key=final_gemini_key)
     else:
         print("هشدار: GEMINI_API_KEY تنظیم نشده است. فراخوانی‌های AI کار نخواهد کرد.")
         client = None
@@ -146,13 +149,4 @@ async def handle_plan_selection(update: Update, context: ContextTypes.DEFAULT_TY
     
     message = (
         f"✅ پلن **{plan_key.upper()}** انتخاب شد.\n\n"
-        f"لطفاً جهت تکمیل خرید و شارژ فوری اعتبار، روی دکمه پرداخت زیر کلیک کنید:\n"
-        f"پس از پرداخت، اعتبار شما به‌طور خودکار شارژ خواهد شد."
-    )
-    
-    payment_keyboard = [
-        [InlineKeyboardButton("💳 شروع پرداخت", url=payment_link)]
-    ]
-    payment_markup = InlineKeyboardMarkup(payment_keyboard)
-
-    await query.edit_message_text(text=message, reply_markup=payment
+        f"لطفاً جهت تکمیل خرید و شارژ فوری اعتبار
