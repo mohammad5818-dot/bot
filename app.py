@@ -110,8 +110,7 @@ async def handle_invite_friends(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     
     user_id = query.from_user.id
-    # برای نمایش نام کاربری ربات، به جای context.bot.username از نام کاربری ربات در اینجا استفاده کنید
-    bot_username = "YourBotUsername" # اگر نام کاربری ربات را می‌دانید، اینجا وارد کنید
+    bot_username = "YourBotUsername" 
     referral_link = f"https://t.me/{context.bot.username if context.bot.username else bot_username}?start=ref_{user_id}"
     
     message = (
@@ -122,8 +121,7 @@ async def handle_invite_friends(update: Update, context: ContextTypes.DEFAULT_TY
     await query.edit_message_text(
         text=message,
         reply_markup=None,
-        # ⭐ اصلاحیه: حذف parse_mode برای جلوگیری از خطای parsing در لینک‌های خام
-        parse_mode='Markdown' 
+        parse_mode='Markdown'
     )
 
 async def handle_purchase_plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -265,199 +263,6 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     user_prompt_raw = update.message.text
     
-    # محدود کردن طول پرامپت (رفع خطای Text is too long)
     user_prompt = user_prompt_raw[:4000]
     
     state = user_states.get(user_id, {'state': 0})
-    current_state = state.get('state', 0)
-
-    if current_state == 1:
-        
-        media_id = state.get('last_photo_id')
-        media_type = 'photo'
-        media_type_fa = "عکس"
-        
-        await update.message.reply_text(
-            f"پرامپت شما: '{user_prompt[:50]}...' دریافت شد.\n"
-            f"{media_type_fa} شما در حال پردازش توسط هوش مصنوعی است. لطفا منتظر بمانید..."
-        )
-
-        ai_output_media_id = None 
-        uploaded_message = None 
-        image = None # برای مدیریت فایل Gemini
-
-        # 📌📌📌 اتصال واقعی به Gemini Flash 2.5 📌📌📌
-        
-        if client:
-            try:
-                # 1. دانلود عکس اصلی از تلگرام
-                telegram_file_object = await context.bot.get_file(media_id)
-                
-                if not hasattr(telegram_file_object, 'download_as_bytearray'):
-                    raise Exception("کتابخانه python-telegram-bot قدیمی است. متد download_as_bytearray یافت نشد.")
-
-                # دانلود فایل به صورت bytearray و تبدیل آن به bytes
-                downloaded_file_bytearray = await telegram_file_object.download_as_bytearray() 
-                downloaded_file_bytes = bytes(downloaded_file_bytearray)
-                
-                # 2. آماده‌سازی محتوا برای Gemini
-                image = client.files.upload(
-                    file=downloaded_file_bytes
-                )
-
-                # 3. فراخوانی مدل Gemini Flash 2.5
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=[
-                        image,
-                        f"این عکس را بر اساس دستور زیر ویرایش کن. فقط عکس ویرایش شده را خروجی بده. دستور: {user_prompt}"
-                    ]
-                ) 
-                
-                # 4. دریافت بایت‌های خروجی
-                if response.candidates and response.candidates[0].content.parts[0].inline_data:
-                    output_data = response.candidates[0].content.parts[0].inline_data.data
-                    
-                    # 5. ارسال خروجی به تلگرام و دریافت File ID جدید
-                    uploaded_message = await context.bot.send_photo(
-                        chat_id=update.effective_chat.id,
-                        photo=InputFile(io.BytesIO(output_data)), 
-                        caption="در حال نهایی‌سازی..." 
-                    )
-                    ai_output_media_id = uploaded_message.photo[-1].file_id
-                    
-                else:
-                    await update.message.reply_text("❌ هوش مصنوعی نتوانست عکس جدیدی تولید کند. (خروجی بدون عکس بود.)")
-                    return 
-                
-            except APIError as e:
-                # پیام خطای API اختصاصی
-                await update.message.reply_text(f"❌ خطای API هوش مصنوعی (Gemini): {e.message}")
-                return
-            except Exception as e:
-                # ⭐ اصلاحیه: ارسال پیام خطا به ادمین (خودتان)
-                admin_id = update.effective_user.id 
-                
-                error_detail = str(e)
-                if len(error_detail) > 4000:
-                    error_detail = error_detail[:4000] + "..."
-                
-                # ارسال جزئیات خطا به خود ادمین
-                await context.bot.send_message(
-                    chat_id=admin_id,
-                    text=f"⚠️ **خطای عیب‌یابی (Admin Alert):**\n\nجزئیات خطا: {error_detail}",
-                    # ⭐ اصلاحیه: حذف parse_mode برای جلوگیری از خطای parsing در متن خطای خام
-                    # parse_mode='Markdown' 
-                )
-                
-                # ارسال پیام کوتاه و دوستانه به کاربر نهایی
-                await update.message.reply_text("❌ خطای نامشخص در پردازش فایل رخ داد. لطفاً دوباره تلاش کنید.")
-                return
-            finally:
-                # ⭐ مطمئن می‌شویم که فایل موقت Gemini حذف شود، در صورت وجود
-                if image:
-                    try:
-                        client.files.delete(name=image.name) 
-                    except Exception:
-                        pass 
-        
-        else:
-            await update.message.reply_text("❌ ربات به API هوش مصنوعی متصل نیست. لطفاً GEMINI_API_KEY را تنظیم کنید.")
-            return
-            
-        # 📌📌📌 پایان اتصال واقعی به Gemini Flash 2.5 📌📌📌
-        
-        
-        # کسر اعتبار
-        user_credits[user_id] -= 1 
-        has_credit, current_credit = check_credit(user_id) 
-        
-        # ذخیره اطلاعات برای اشتراک‌گذاری در کانال
-        callback_key = f"share_{user_id}_{update.update_id}" 
-        context.user_data[callback_key] = {
-            'media_id': ai_output_media_id, 
-            'prompt': user_prompt, 
-            'media_type': media_type
-        }
-
-        # تعریف دکمه شیشه‌ای برای ارسال به کانال
-        share_keyboard = [
-            [InlineKeyboardButton("🖼 ارسال به کانال نمونه‌ها", callback_data=f'share_to_channel|{callback_key}')]
-        ]
-        share_markup = InlineKeyboardMarkup(share_keyboard)
-        
-        # ارسال خروجی نهایی (به‌روزرسانی کپشن پیام موقتی که قبلا فرستاده شد)
-        caption = (
-            f"✅ پردازش موفقیت‌آمیز بود! (خروجی هوش مصنوعی)\n\n"
-            f"اعتبار باقی‌مانده شما: {current_credit} عکس."
-        )
-        
-        if uploaded_message:
-            await context.bot.edit_message_caption(
-                chat_id=uploaded_message.chat.id,
-                message_id=uploaded_message.message_id,
-                caption=caption,
-                reply_markup=share_markup
-            )
-        
-        # ریست وضعیت
-        user_states[user_id] = {'state': 0}
-        
-        return
-
-    if current_state in ['waiting_for_start_confirm', 'waiting_for_channel_check']:
-        await update.message.reply_text("لطفا برای ادامه، روی دکمه‌های شیشه‌ای که زیر پیام‌های قبلی ارسال شد، کلیک کنید.")
-        return
-
-    await update.message.reply_text("لطفا عکس خود را بفرستید یا از دستور /start استفاده کنید.")
-
-
-# =========================================================
-# تابع اصلی و اجرای وب‌هوک
-# =========================================================
-def main():
-    
-    final_token = os.environ.get("TOKEN", TOKEN)
-
-    if not WEBHOOK_URL:
-        print("خطا: متغیر محیطی WEBHOOK_URL در Render تنظیم نشده است.")
-        return
-
-    application = (
-        Application.builder()
-        .token(final_token) 
-        .build()
-    )
-    
-    # هندلرهای دستورات
-    application.add_handler(CommandHandler("start", start))
-    
-    # هندلرهای Callback Query (دکمه‌های شیشه‌ای)
-    application.add_handler(CallbackQueryHandler(send_channel_check_message, pattern='^start_confirmation$'))
-    application.add_handler(CallbackQueryHandler(check_membership_callback, pattern='^check_membership$'))
-    
-    application.add_handler(CallbackQueryHandler(share_to_channel_callback, pattern=r'^share_to_channel\|'))
-
-    # هندلرهای مدیریت اعتبار
-    application.add_handler(CallbackQueryHandler(handle_invite_friends, pattern='^credit_invite_friends$'))
-    application.add_handler(CallbackQueryHandler(handle_purchase_plans, pattern='^credit_purchase_plans$'))
-    application.add_handler(CallbackQueryHandler(handle_plan_selection, pattern=r'^buy_plan_(bronze|silver|gold)$'))
-
-    # هندلرهای مدیا و متن
-    application.add_handler(MessageHandler(filters.PHOTO, handle_photo)) 
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_prompt)) 
-    
-    # --- تنظیمات وب‌هوک ---
-    full_url = WEBHOOK_URL + WEBHOOK_PATH
-    
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        url_path=WEBHOOK_PATH,
-        webhook_url=full_url
-    )
-
-    print(f"ربات با وب‌هوک روی URL زیر اجرا شد: {full_url}")
-
-if __name__ == "__main__":
-    main()
