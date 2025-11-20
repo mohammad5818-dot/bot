@@ -18,7 +18,7 @@ TARGET_CHANNEL_USERNAME = "@hodhod500_ax"
 
 PORT = int(os.environ.get("PORT", 8443)) 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL") 
-WEBHOOK_PATH = "/" + os.environ.get("TOKEN", TOKEN) # استفاده از متغیر محیطی برای توکن در مسیر وب‌هوک
+WEBHOOK_PATH = "/" + os.environ.get("TOKEN", TOKEN) 
 
 user_states = {} 
 user_credits = {} 
@@ -29,7 +29,6 @@ user_credits = {}
 
 # اتصال به Gemini
 try:
-    # ابتدا از متغیرهای محیطی می خواند.
     final_gemini_key = os.environ.get("GEMINI_API_KEY", GEMINI_API_KEY)
     
     if final_gemini_key and final_gemini_key != "YOUR_GEMINI_API_KEY_HERE":
@@ -284,6 +283,7 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         ai_output_media_id = None 
         uploaded_message = None 
+        image = None # برای مدیریت فایل Gemini
 
         # 📌📌📌 اتصال واقعی به Gemini Flash 2.5 📌📌📌
         
@@ -291,7 +291,7 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 # 1. دانلود عکس اصلی از تلگرام
                 
-                # استفاده از متد download_as_bytearray برای رفع خطای 'download_as_bytes'
+                # استفاده از متد download_as_bytearray 
                 telegram_file_object = await context.bot.get_file(media_id)
                 
                 if not hasattr(telegram_file_object, 'download_as_bytearray'):
@@ -330,23 +330,23 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     
                 else:
                     await update.message.reply_text("❌ هوش مصنوعی نتوانست عکس جدیدی تولید کند. (خروجی بدون عکس بود.)")
-                    client.files.delete(name=image.name) 
                     return 
                 
-                # حذف فایل موقت آپلود شده در Gemini
-                client.files.delete(name=image.name) 
-                
             except APIError as e:
+                # پیام خطای API اختصاصی
                 await update.message.reply_text(f"❌ خطای API هوش مصنوعی (Gemini): {e.message}")
                 return
             except Exception as e:
-                # مدیریت طول پیام خطا برای جلوگیری از خطای طولانی بودن متن تلگرام
-                error_message = str(e)
-                if len(error_message) > 400:
-                    error_message = error_message[:400] + "..."
-                
-                await update.message.reply_text(f"❌ خطای نامشخص در پردازش تصویر: {error_message}")
+                # ⭐ اصلاحیه: پیام خطای عمومی را به یک پیام ثابت و کوتاه تغییر می‌دهیم تا از نمایش بایت‌های طولانی یا متون ناشناخته جلوگیری شود.
+                await update.message.reply_text("❌ خطای نامشخص در پردازش فایل رخ داد. لطفاً دوباره تلاش کنید.")
                 return
+            finally:
+                # ⭐ مطمئن می‌شویم که فایل موقت Gemini حذف شود، در صورت وجود
+                if image:
+                    try:
+                        client.files.delete(name=image.name) 
+                    except Exception:
+                        pass 
         
         else:
             await update.message.reply_text("❌ ربات به API هوش مصنوعی متصل نیست. لطفاً GEMINI_API_KEY را تنظیم کنید.")
